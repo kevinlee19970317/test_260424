@@ -185,17 +185,30 @@ def fetch_prices_via_rapidapi(origin, dest, start_date, end_date, direct_only=Tr
     r.raise_for_status()
     payload = r.json()
 
-    data = payload.get("data") or {}
+    if not isinstance(payload, dict):
+        return []
+
+    data = payload.get("data")
+    if isinstance(data, str):
+        # Some endpoints return data as message string on soft failures
+        return []
+    if not isinstance(data, dict):
+        data = {}
 
     # getMinPrice style response
     min_price = data.get("minPrice") or data.get("price") or payload.get("minPrice")
     if min_price is not None:
-        return [{
-            "depart_date": start_date,
-            "price": float(min_price),
-            "is_direct": True,
-            "url": endpoint,
-        }]
+        try:
+            min_price_value = float(min_price)
+        except (TypeError, ValueError):
+            min_price_value = None
+        if min_price_value is not None:
+            return [{
+                "depart_date": start_date,
+                "price": min_price_value,
+                "is_direct": True,
+                "url": endpoint,
+            }]
 
     # searchFlights style response
     flights = data.get("flights", [])
